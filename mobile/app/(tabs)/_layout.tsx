@@ -15,9 +15,9 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="scan"
+                name="shelfie"
                 options={{
-                    title: 'Scan',
+                    title: 'Shelfie',
                     tabBarIcon: ({ color, size }) => <Ionicons name="camera-outline" color={color} size={size} />,
                 }}
             />

@@ -13,7 +13,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     <View className="flex-1 items-center justify-center p-6">
       <Text className="mb-2 font-semibold">Well, this can't be good.</Text>
       <Text className="mb-4">{error.message}</Text>
-      <Text className="text-blue-600" onPress={retry}>
+      <Text className="text-gray-800" onPress={retry}>
         Try again
       </Text>
     </View>

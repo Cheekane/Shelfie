@@ -33,16 +33,16 @@ export default function ScanScreen() {
 
     return (
         <View className="flex-1 bg-slate-50">
-            <Header title="Scan" subtitle="Photograph a bookshelf" />
+            <Header title="Shelfie" subtitle="Photograph a bookshelf" />
             <Screen>
                 {imageUri && (
                     <Image source={{ uri: imageUri }} className="h-80 w-full rounded-2xl border border-slate-200" resizeMode="cover" />
                 )}
                 <Pressable onPress={() => pickPhoto('camera')} className="w-full items-center rounded-lg bg-blue-600 py-3 active:bg-blue-700">
-                    <Text className="font-semibold text-white">Take a Photo</Text>
+                    <Text className="font-semibold text-white">Take a Shelfie</Text>
                 </Pressable>
                 <Pressable onPress={() => pickPhoto('library')} className="w-full items-center rounded-lg bg-slate-100 py-3 active:bg-slate-200">
-                    <Text className="font-semibold text-slate-900">Choose a Photo</Text>
+                    <Text className="font-semibold text-slate-900">Choose a Shelfie</Text>
                 </Pressable>
             </Screen>
         </View>
