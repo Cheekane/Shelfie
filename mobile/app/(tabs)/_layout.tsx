@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 // A folder named in parens -- (tabs) -- is an Expo Router "group": it
@@ -6,8 +7,20 @@ import { Tabs } from 'expo-router';
 export default function TabsLayout() {
     return (
         <Tabs screenOptions={{ headerShown: false }}>
-            <Tabs.Screen name="index" options={{ title: 'Library' }} />
-            <Tabs.Screen name="scan" options={{ title: 'Scan' }} />
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: 'Library',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="library-outline" color={color} size={size} />,
+                }}
+            />
+            <Tabs.Screen
+                name="scan"
+                options={{
+                    title: 'Scan',
+                    tabBarIcon: ({ color, size }) => <Ionicons name="camera-outline" color={color} size={size} />,
+                }}
+            />
         </Tabs>
     );
 }
