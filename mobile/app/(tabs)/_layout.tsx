@@ -6,7 +6,7 @@ import { Tabs } from 'expo-router';
 // bar below) without adding "/tabs" to either screen's URL.
 export default function TabsLayout() {
     return (
-        <Tabs screenOptions={{ headerShown: false }}>
+        <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: '#0f172a', tabBarInactiveTintColor: '#94a3b8' }}>
             <Tabs.Screen
                 name="index"
                 options={{

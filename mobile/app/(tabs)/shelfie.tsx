@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     requestMediaLibraryPermissionsAsync,
     requestCameraPermissionsAsync,
@@ -8,10 +9,10 @@ import {
 } from 'expo-image-picker';
 
 import { Header } from '../../components/Header';
-import { Screen } from '../../components/Screen';
 
 export default function ScanScreen() {
     const [imageUri, setImageUri] = useState<string | null>(null);
+    const insets = useSafeAreaInsets();
 
     async function pickPhoto(source: 'camera' | 'library') {
         const permission = source === 'camera'
@@ -34,17 +35,25 @@ export default function ScanScreen() {
     return (
         <View className="flex-1 bg-slate-50">
             <Header title="Shelfie" subtitle="Photograph a bookshelf" />
-            <Screen>
-                {imageUri && (
-                    <Image source={{ uri: imageUri }} className="h-80 w-full rounded-2xl border border-slate-200" resizeMode="cover" />
+
+            <View className="flex-1 p-5">
+                {imageUri ? (
+                    <Image source={{ uri: imageUri }} className="h-full w-full rounded-2xl border border-slate-200" resizeMode="cover" />
+                ) : (
+                    <View className="h-full w-full items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white">
+                        <Text className="text-slate-400">No photo yet</Text>
+                    </View>
                 )}
-                <Pressable onPress={() => pickPhoto('camera')} className="w-full items-center rounded-lg bg-gray-800 py-3 active:bg-gray-700">
-                    <Text className="font-semibold text-white">Take a Shelfie</Text>
+            </View>
+
+            <View className="flex-row gap-3 px-5" style={{ paddingBottom: insets.bottom + 16 }}>
+                <Pressable onPress={() => pickPhoto('camera')} className="flex-1 items-center rounded-lg bg-slate-900 py-4 active:bg-slate-800">
+                    <Text className="text-base font-semibold text-white">Take a Shelfie</Text>
                 </Pressable>
-                <Pressable onPress={() => pickPhoto('library')} className="w-full items-center rounded-lg bg-slate-300 py-3 active:bg-slate-200">
-                    <Text className="font-semibold text-slate-900">Choose a Shelfie</Text>
+                <Pressable onPress={() => pickPhoto('library')} className="flex-1 items-center rounded-lg bg-slate-100 py-4 active:bg-slate-200">
+                    <Text className="text-base font-semibold text-slate-900">Choose a Shelfie</Text>
                 </Pressable>
-            </Screen>
+            </View>
         </View>
     );
 }
