@@ -1,19 +1,21 @@
+from datetime import datetime
+
 from django.db import models
 
 
 class LibraryBook(models.Model):
-    title = models.CharField(max_length=300)
-    author = models.CharField(max_length=300)
+    title: str = models.CharField(max_length=300)
+    author: str = models.CharField(max_length=300)
 
     # Soft reference to a catalog.csv row -- not a real ForeignKey since
     # the catalog isn't a database table. Null for manual/unmatched entries.
-    catalog_id = models.CharField(max_length=50, null=True, blank=True)
+    catalog_id: str | None = models.CharField(max_length=50, null=True, blank=True)
 
     # Raw VLM read, kept for comparison against the confirmed title/author above.
-    ocr_title = models.CharField(max_length=300, blank=True)
-    ocr_author = models.CharField(max_length=300, blank=True)
+    ocr_title: str = models.CharField(max_length=300, blank=True)
+    ocr_author: str = models.CharField(max_length=300, blank=True)
 
-    match_confidence = models.FloatField(null=True, blank=True)
+    match_confidence: float | None = models.FloatField(null=True, blank=True)
 
     MATCH_STATUS_CHOICES = [
         ("auto", "auto"),
@@ -21,9 +23,9 @@ class LibraryBook(models.Model):
         ("reviewed_corrected", "reviewed_corrected"),
         ("manual", "manual"),
     ]
-    match_status_at_add = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES)
+    match_status_at_add: str = models.CharField(max_length=20, choices=MATCH_STATUS_CHOICES)
 
-    added_at = models.DateTimeField(auto_now_add=True)
+    added_at: datetime = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.title} by {self.author}"
