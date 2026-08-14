@@ -1,5 +1,7 @@
 from django.urls import path
 
+from . import views
+
 urlpatterns = [
-    # endpoints go here once views exist
+    path("library/", views.library_collection, name="library_collection"),
 ]
