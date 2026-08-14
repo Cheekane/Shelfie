@@ -9,8 +9,8 @@ interface SectionProps {
 
 export function Section({ sectionName, className, children }: SectionProps) {
     return (
-        <View className={className ? className : "w-full h-32 border-2 border-gray-800 rounded-lg p-2"}>
-            <Text className="text-gray-800 text-lg font-bold">{sectionName}</Text>
+        <View className={className ?? "w-full gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"}>
+            <Text className="text-lg font-semibold text-slate-900">{sectionName}</Text>
             {children}
         </View>
     );

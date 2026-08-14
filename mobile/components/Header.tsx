@@ -14,9 +14,9 @@ export function Header({ title, subtitle }: HeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="bg-gray-900 px-5 pb-4" style={{ paddingTop: insets.top + 12 }}>
+    <View className="bg-slate-900 px-5 pb-5" style={{ paddingTop: insets.top + 12 }}>
       <Text className="text-2xl font-bold text-white">{title}</Text>
-      {subtitle ? <Text className="mt-1 text-sm text-white">{subtitle}</Text> : null}
+      {subtitle ? <Text className="mt-1 text-sm text-slate-300">{subtitle}</Text> : null}
     </View>
   );
 }
