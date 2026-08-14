@@ -51,11 +51,11 @@ export default function HomeScreen() {
                     </Link>
                 </Section>
                 <Section sectionName="Scan">
-                    <Pressable onPress={() => pickPhoto('camera')} className="w-full items-center rounded-lg bg-blue-600 py-3 active:bg-blue-700">
-                        <Text className="font-semibold text-white">Take a Photo</Text>
+                    <Pressable onPress={() => pickPhoto('camera')} className="w-full items-center rounded-lg bg-gray-800 py-3 active:bg-gray-700">
+                        <Text className="font-semibold text-white">Take a Shelfie</Text>
                     </Pressable>
                     <Pressable onPress={() => pickPhoto('library')} className="w-full items-center rounded-lg bg-slate-100 py-3 active:bg-slate-200">
-                        <Text className="font-semibold text-slate-900">Choose a Photo</Text>
+                        <Text className="font-semibold text-slate-900">Choose a Shelfie</Text>
                     </Pressable>
                 </Section>
             </Screen>
