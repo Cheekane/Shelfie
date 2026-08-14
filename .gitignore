@@ -1,0 +1,28 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*.egg-info/
+backend/.venv/
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+
+# Secrets
+.env
+*.env
+!.env.example
+
+# Node / Expo / React Native
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.jsbundle
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
