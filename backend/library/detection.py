@@ -10,7 +10,7 @@ from ultralytics.engine.results import Boxes, Results
 
 WEIGHTS_PATH: Path = Path(__file__).resolve().parent / "weights" / "yolov8n.pt"
 BOOK_CLASS_ID: int = 73  # COCO class index for "book"
-CONFIDENCE_THRESHOLD: float = 0.17
+CONFIDENCE_THRESHOLD: float = 0.2
 CROP_PADDING_RATIO: float = 0.01  # margin
 
 
