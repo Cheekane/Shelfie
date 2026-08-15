@@ -41,9 +41,9 @@ export default function ScanScreen() {
         try {
             await scanPhoto(imageUri);
             setImageUri(null);
-            // Scan results now live in PendingDetection rows on the
-            // backend -- Library is where "needs review" actually shows.
-            router.push('/');
+            // Scan results land as PendingDetection rows on the backend --
+            // go straight to reviewing them instead of the Library summary.
+            router.push('/review');
         } catch (err) {
             Alert.alert('Scan failed', err instanceof ApiError ? err.message : 'Something went wrong scanning this photo.');
         } finally {

@@ -1,14 +1,19 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 
 import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
 import { LibraryBookCard } from '../../components/LibraryBookCard';
-import { PendingBookCard } from '../../components/PendingBookCard';
 import { Section } from '../../components/Section';
 import { ApiError, fetchLibrary, fetchPending } from '../../lib/api';
 import type { LibraryBook, PendingDetection } from '../../types/api';
+
+function reviewSummary(pending: PendingDetection[] | null): string {
+    if (pending === null) return 'Loading...';
+    if (pending.length === 0) return 'Nothing to review right now';
+    return `${pending.length} scanned book${pending.length === 1 ? '' : 's'} waiting`;
+}
 
 export default function LibraryScreen() {
     const [pending, setPending] = useState<PendingDetection[] | null>(null);
@@ -39,15 +44,6 @@ export default function LibraryScreen() {
         setRefreshing(false);
     }
 
-    function handleConfirmed(id: number): void {
-        setPending((prev) => prev?.filter((d) => d.id !== id) ?? null);
-        load(); // the confirmed book now needs to show up in the library section too
-    }
-
-    function handleDiscarded(id: number): void {
-        setPending((prev) => prev?.filter((d) => d.id !== id) ?? null);
-    }
-
     return (
         <View className="flex-1 bg-slate-50">
             <Header title="Library" subtitle="Your confirmed books" />
@@ -62,19 +58,18 @@ export default function LibraryScreen() {
                         </View>
                     )}
 
-                    <Section sectionName={pending ? `Needs Review (${pending.length})` : 'Needs Review'} className="gap-3">
-                        {pending === null ? (
-                            <ActivityIndicator />
-                        ) : pending.length === 0 ? (
-                            <EmptyState message="Nothing to review right now. Scan a shelf to add books here." />
-                        ) : (
-                            pending.map((d) => (
-                                <PendingBookCard key={d.id} detection={d} onConfirmed={handleConfirmed} onDiscarded={handleDiscarded} />
-                            ))
-                        )}
-                    </Section>
+                    <Pressable
+                        onPress={() => router.push('/review')}
+                        className="w-full flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50"
+                    >
+                        <View>
+                            <Text className="text-lg font-semibold text-slate-900">Needs Review</Text>
+                            <Text className="mt-1 text-sm text-slate-500">{reviewSummary(pending)}</Text>
+                        </View>
+                        <Text className="text-2xl text-slate-300">{'›'}</Text>
+                    </Pressable>
 
-                    <Section sectionName="My Library" className="gap-3">
+                    <Section sectionName="Library" className="gap-3">
                         {books === null ? (
                             <ActivityIndicator />
                         ) : books.length === 0 ? (
