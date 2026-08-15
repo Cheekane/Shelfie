@@ -1,7 +1,9 @@
 import io
 import logging
+from typing import Any
 
 from django.core.files.base import ContentFile
+from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404
 from PIL import Image
 from rest_framework.decorators import api_view
@@ -13,6 +15,36 @@ from .models import LibraryBook, PendingDetection
 from .serializers import LibraryBookSerializer, PendingDetectionSerializer
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+DEFAULT_PAGE_SIZE: int = 20
+MAX_PAGE_SIZE: int = 50
+
+
+def _paginate(request: Request, queryset: QuerySet) -> tuple[QuerySet, dict[str, Any]]:
+    """Simple page-number slicing, kept in the view instead of DRF's
+    generic pagination classes -- these endpoints are plain function views
+    with a custom top-level response key ("detections"/"books"), not a
+    ViewSet, so DRF's paginator would want to own the whole response shape.
+    """
+    try:
+        page = max(int(request.query_params.get("page", 1)), 1)
+    except ValueError:
+        page = 1
+    try:
+        page_size = min(max(int(request.query_params.get("page_size", DEFAULT_PAGE_SIZE)), 1), MAX_PAGE_SIZE)
+    except ValueError:
+        page_size = DEFAULT_PAGE_SIZE
+
+    count: int = queryset.count()
+    start: int = (page - 1) * page_size
+    page_items: QuerySet = queryset[start : start + page_size]
+    meta: dict[str, Any] = {
+        "page": page,
+        "page_size": page_size,
+        "count": count,
+        "has_next": start + page_size < count,
+    }
+    return page_items, meta
 
 # Real phone photos can be 3000px+ on a side. Downscaling before local
 # detection keeps YOLO inference fast and keeps VLM image-token cost
@@ -108,8 +140,10 @@ def scan_photo(request: Request) -> Response:
 @api_view(["GET"])
 def pending_collection(request: Request) -> Response:
     pending = PendingDetection.objects.all().order_by("created_at")
+    page_items, meta = _paginate(request, pending)
     return Response({
-        "detections": PendingDetectionSerializer(pending, many=True, context={"request": request}).data,
+        "detections": PendingDetectionSerializer(page_items, many=True, context={"request": request}).data,
+        **meta,
     })
 
 
@@ -139,10 +173,12 @@ def pending_detail(request: Request, pending_id: int) -> Response:
 @api_view(["GET", "POST"])
 def library_collection(request: Request) -> Response:
     if request.method == "GET":
-        # queries all library books
-        books = LibraryBook.objects.all()
-        # serializes then sends the data
-        return Response({"books": LibraryBookSerializer(books, many=True).data})
+        books = LibraryBook.objects.all().order_by("-added_at")
+        page_items, meta = _paginate(request, books)
+        return Response({
+            "books": LibraryBookSerializer(page_items, many=True).data,
+            **meta,
+        })
 
     # POST: confirm a batch of books into the library.
     serializer = LibraryBookSerializer(data=request.data.get("books", []), many=True)

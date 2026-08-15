@@ -4,30 +4,27 @@ import { router, useFocusEffect } from 'expo-router';
 
 import { EmptyState } from '../components/EmptyState';
 import { Header } from '../components/Header';
-import { PendingBookCard } from '../components/PendingBookCard';
-import { ApiError, fetchPending } from '../lib/api';
-import type { PendingDetection } from '../types/api';
+import { LibraryBookCard } from '../components/LibraryBookCard';
+import { ApiError, fetchLibrary } from '../lib/api';
+import type { LibraryBook } from '../types/api';
 
-export default function ReviewScreen() {
-    const [pending, setPending] = useState<PendingDetection[] | null>(null);
+export default function LibraryListScreen() {
+    const [books, setBooks] = useState<LibraryBook[] | null>(null);
     const [page, setPage] = useState<number>(1);
     const [hasNext, setHasNext] = useState<boolean>(false);
     const [loadingMore, setLoadingMore] = useState<boolean>(false);
     const [refreshing, setRefreshing] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Reset to page 1 -- pending items can change from other screens (a
-    // fresh scan, a confirm/discard elsewhere), so a stale later page
-    // isn't safe to keep showing.
     const loadFirstPage = useCallback(async (): Promise<void> => {
         try {
             setError(null);
-            const res = await fetchPending(1);
-            setPending(res.detections);
+            const res = await fetchLibrary(1);
+            setBooks(res.books);
             setPage(1);
             setHasNext(res.has_next);
         } catch (err) {
-            setError(err instanceof ApiError ? err.message : 'Could not load pending books.');
+            setError(err instanceof ApiError ? err.message : 'Could not load your library.');
         }
     }, []);
 
@@ -48,8 +45,8 @@ export default function ReviewScreen() {
         setLoadingMore(true);
         try {
             const nextPage = page + 1;
-            const res = await fetchPending(nextPage);
-            setPending((prev) => (prev ?? []).concat(res.detections));
+            const res = await fetchLibrary(nextPage);
+            setBooks((prev) => (prev ?? []).concat(res.books));
             setPage(nextPage);
             setHasNext(res.has_next);
         } catch (err) {
@@ -59,34 +56,18 @@ export default function ReviewScreen() {
         }
     }
 
-    function handleConfirmed(id: number): void {
-        setPending((prev) => prev?.filter((d) => d.id !== id) ?? null);
-    }
-
-    function handleDiscarded(id: number): void {
-        setPending((prev) => prev?.filter((d) => d.id !== id) ?? null);
-    }
-
     return (
         <View className="flex-1 bg-slate-50">
-            <Header title="Needs Review" subtitle="Confirm or discard scanned books" onBack={() => router.back()} />
+            <Header title="Library" subtitle="Your confirmed books" onBack={() => router.back()} />
             <FlatList
                 className="flex-1"
                 contentContainerStyle={{ padding: 20, gap: 12 }}
-                data={pending ?? []}
-                keyExtractor={(d) => String(d.id)}
-                renderItem={({ item }) => (
-                    <PendingBookCard detection={item} onConfirmed={handleConfirmed} onDiscarded={handleDiscarded} />
-                )}
+                data={books ?? []}
+                keyExtractor={(b) => String(b.id)}
+                renderItem={({ item }) => <LibraryBookCard book={item} />}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
                 onEndReached={loadNextPage}
                 onEndReachedThreshold={0.5}
-                // Off-screen cards don't need to stay mounted -- they're
-                // form inputs, not cheap text rows, so this keeps memory
-                // and render time bounded no matter how many are pending.
-                windowSize={7}
-                maxToRenderPerBatch={8}
-                removeClippedSubviews
                 ListHeaderComponent={
                     error ? (
                         <View className="rounded-lg bg-red-50 p-3">
@@ -96,13 +77,12 @@ export default function ReviewScreen() {
                 }
                 ListFooterComponent={loadingMore ? <ActivityIndicator className="py-4" /> : null}
                 ListEmptyComponent={
-                    pending === null ? (
+                    books === null ? (
                         <ActivityIndicator />
                     ) : (
-                        <EmptyState message="Nothing to review right now. Scan a shelf to add books here." />
+                        <EmptyState message="Your library is empty, take a shelfie to get started." />
                     )
                 }
-                keyboardShouldPersistTaps="handled"
             />
         </View>
     );

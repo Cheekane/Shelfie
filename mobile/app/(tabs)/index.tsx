@@ -1,32 +1,57 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
-import { EmptyState } from '../../components/EmptyState';
 import { Header } from '../../components/Header';
-import { LibraryBookCard } from '../../components/LibraryBookCard';
-import { Section } from '../../components/Section';
 import { ApiError, fetchLibrary, fetchPending } from '../../lib/api';
-import type { LibraryBook, PendingDetection } from '../../types/api';
 
-function reviewSummary(pending: PendingDetection[] | null): string {
-    if (pending === null) return 'Loading...';
-    if (pending.length === 0) return 'Nothing to review right now';
-    return `${pending.length} scanned book${pending.length === 1 ? '' : 's'} waiting`;
+interface SummaryCardProps {
+    title: string;
+    subtitle: string;
+    onPress: () => void;
 }
 
-export default function LibraryScreen() {
-    const [pending, setPending] = useState<PendingDetection[] | null>(null);
-    const [books, setBooks] = useState<LibraryBook[] | null>(null);
+function SummaryCard({ title, subtitle, onPress }: SummaryCardProps) {
+    return (
+        <Pressable
+            onPress={onPress}
+            className="w-full flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50"
+        >
+            <View>
+                <Text className="text-lg font-semibold text-slate-900">{title}</Text>
+                <Text className="mt-1 text-sm text-slate-500">{subtitle}</Text>
+            </View>
+            <Text className="text-2xl text-slate-300">{'›'}</Text>
+        </Pressable>
+    );
+}
+
+function librarySummary(count: number | null): string {
+    if (count === null) return 'Loading...';
+    if (count === 0) return 'No books yet, take a shelfie to get started';
+    return `${count} confirmed book${count === 1 ? '' : 's'}`;
+}
+
+function reviewSummary(count: number | null): string {
+    if (count === null) return 'Loading...';
+    if (count === 0) return 'Nothing to review right now';
+    return `${count} scanned book${count === 1 ? '' : 's'} waiting`;
+}
+
+export default function DashboardScreen() {
+    const [libraryCount, setLibraryCount] = useState<number | null>(null);
+    const [pendingCount, setPendingCount] = useState<number | null>(null);
     const [refreshing, setRefreshing] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(async (): Promise<void> => {
         try {
             setError(null);
-            const [pendingRes, libraryRes] = await Promise.all([fetchPending(), fetchLibrary()]);
-            setPending(pendingRes.detections);
-            setBooks(libraryRes.books);
+            // page_size=1 -- this screen only needs the totals for each
+            // summary card, not the actual book/pending lists.
+            const [libraryRes, pendingRes] = await Promise.all([fetchLibrary(1, 1), fetchPending(1, 1)]);
+            setLibraryCount(libraryRes.count);
+            setPendingCount(pendingRes.count);
         } catch (err) {
             setError(err instanceof ApiError ? err.message : 'Could not load your library.');
         }
@@ -46,38 +71,20 @@ export default function LibraryScreen() {
 
     return (
         <View className="flex-1 bg-slate-50">
-            <Header title="Library" subtitle="Your confirmed books" />
+            <Header title="Library" subtitle="Your books at a glance" />
             <ScrollView
                 className="flex-1"
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             >
-                <View className="gap-4 p-5">
+                <View className="gap-3 p-5">
                     {error && (
                         <View className="rounded-lg bg-red-50 p-3">
                             <Text className="text-red-800">{error}</Text>
                         </View>
                     )}
 
-                    <Pressable
-                        onPress={() => router.push('/review')}
-                        className="w-full flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm active:bg-slate-50"
-                    >
-                        <View>
-                            <Text className="text-lg font-semibold text-slate-900">Needs Review</Text>
-                            <Text className="mt-1 text-sm text-slate-500">{reviewSummary(pending)}</Text>
-                        </View>
-                        <Text className="text-2xl text-slate-300">{'›'}</Text>
-                    </Pressable>
-
-                    <Section sectionName="Library" className="gap-3">
-                        {books === null ? (
-                            <ActivityIndicator />
-                        ) : books.length === 0 ? (
-                            <EmptyState message="Your library is empty, scan a shelf to get started." />
-                        ) : (
-                            books.map((b) => <LibraryBookCard key={b.id} book={b} />)
-                        )}
-                    </Section>
+                    <SummaryCard title="Library" subtitle={librarySummary(libraryCount)} onPress={() => router.push('/library')} />
+                    <SummaryCard title="Needs Review" subtitle={reviewSummary(pendingCount)} onPress={() => router.push('/review')} />
                 </View>
             </ScrollView>
         </View>

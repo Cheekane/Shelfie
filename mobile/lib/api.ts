@@ -60,8 +60,13 @@ export async function scanPhoto(imageUri: string): Promise<ScanResponse> {
     return parseOrThrow<ScanResponse>(response);
 }
 
-export async function fetchPending(): Promise<PendingResponse> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/api/pending/`, { method: 'GET' }, DEFAULT_TIMEOUT_MS);
+export async function fetchPending(page: number = 1, pageSize?: number): Promise<PendingResponse> {
+    const query = pageSize ? `page=${page}&page_size=${pageSize}` : `page=${page}`;
+    const response = await fetchWithTimeout(
+        `${API_BASE_URL}/api/pending/?${query}`,
+        { method: 'GET' },
+        DEFAULT_TIMEOUT_MS
+    );
     return parseOrThrow<PendingResponse>(response);
 }
 
@@ -87,7 +92,12 @@ export async function discardPending(pendingId: number): Promise<void> {
     await parseOrThrow<void>(response);
 }
 
-export async function fetchLibrary(): Promise<LibraryResponse> {
-    const response = await fetchWithTimeout(`${API_BASE_URL}/api/library/`, { method: 'GET' }, DEFAULT_TIMEOUT_MS);
+export async function fetchLibrary(page: number = 1, pageSize?: number): Promise<LibraryResponse> {
+    const query = pageSize ? `page=${page}&page_size=${pageSize}` : `page=${page}`;
+    const response = await fetchWithTimeout(
+        `${API_BASE_URL}/api/library/?${query}`,
+        { method: 'GET' },
+        DEFAULT_TIMEOUT_MS
+    );
     return parseOrThrow<LibraryResponse>(response);
 }

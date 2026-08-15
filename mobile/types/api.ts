@@ -38,7 +38,14 @@ export interface ScanResponse {
     meta: ScanMeta;
 }
 
-export interface PendingResponse {
+export interface Page {
+    page: number;
+    page_size: number;
+    count: number;
+    has_next: boolean;
+}
+
+export interface PendingResponse extends Page {
     detections: PendingDetection[];
 }
 
@@ -56,7 +63,7 @@ export interface LibraryBook {
     added_at: string;
 }
 
-export interface LibraryResponse {
+export interface LibraryResponse extends Page {
     books: LibraryBook[];
 }
 
