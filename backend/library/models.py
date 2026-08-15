@@ -32,12 +32,9 @@ class LibraryBook(models.Model):
 
 
 class PendingDetection(models.Model):
-    # A row existing here IS the "needs review" signal -- no status field.
+    # A row existing here is the "needs review" signal.
     # Confirming copies it into LibraryBook and deletes this row; discarding
-    # just deletes this row. Match info (candidates, confidence) isn't
-    # stored either -- matching.py is cheap and deterministic, so it's
-    # recomputed live from ocr_title/ocr_author whenever this is fetched,
-    # rather than risking a stale cached result.
+    # just deletes this row.
     crop_image = models.ImageField(upload_to="pending_crops/")
     READ_STATUS_CHOICES = [
         ("ok", "ok"),

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import {
     requestMediaLibraryPermissionsAsync,
     requestCameraPermissionsAsync,
@@ -9,12 +10,14 @@ import {
 } from 'expo-image-picker';
 
 import { Header } from '../../components/Header';
+import { ApiError, scanPhoto } from '../../lib/api';
 
 export default function ScanScreen() {
     const [imageUri, setImageUri] = useState<string | null>(null);
+    const [scanning, setScanning] = useState<boolean>(false);
     const insets = useSafeAreaInsets();
 
-    async function pickPhoto(source: 'camera' | 'library') {
+    async function pickPhoto(source: 'camera' | 'library'): Promise<void> {
         const permission = source === 'camera'
             ? await requestCameraPermissionsAsync()
             : await requestMediaLibraryPermissionsAsync();
@@ -32,6 +35,22 @@ export default function ScanScreen() {
         }
     }
 
+    async function runScan(): Promise<void> {
+        if (!imageUri) return;
+        setScanning(true);
+        try {
+            await scanPhoto(imageUri);
+            setImageUri(null);
+            // Scan results now live in PendingDetection rows on the
+            // backend -- Library is where "needs review" actually shows.
+            router.push('/');
+        } catch (err) {
+            Alert.alert('Scan failed', err instanceof ApiError ? err.message : 'Something went wrong scanning this photo.');
+        } finally {
+            setScanning(false);
+        }
+    }
+
     return (
         <View className="flex-1 bg-slate-50">
             <Header title="Shelfie" subtitle="Photograph a bookshelf" />
@@ -46,11 +65,26 @@ export default function ScanScreen() {
                 )}
             </View>
 
+            {imageUri && (
+                <View className="px-5 pb-3">
+                    <Pressable
+                        onPress={runScan}
+                        disabled={scanning}
+                        className="flex-row items-center justify-center gap-2 rounded-lg bg-slate-900 py-4 active:bg-slate-800 disabled:opacity-60"
+                    >
+                        {scanning && <ActivityIndicator color="white" />}
+                        <Text className="text-base font-semibold text-white">
+                            {scanning ? 'Detecting spines, reading titles...' : 'Scan This Shelf'}
+                        </Text>
+                    </Pressable>
+                </View>
+            )}
+
             <View className="flex-row gap-3 px-5" style={{ paddingBottom: insets.bottom + 16 }}>
-                <Pressable onPress={() => pickPhoto('camera')} className="flex-1 items-center rounded-lg bg-slate-900 py-4 active:bg-slate-800">
+                <Pressable onPress={() => pickPhoto('camera')} disabled={scanning} className="flex-1 items-center rounded-lg bg-slate-900 py-4 active:bg-slate-800 disabled:opacity-60">
                     <Text className="text-base font-semibold text-white">Take a Shelfie</Text>
                 </Pressable>
-                <Pressable onPress={() => pickPhoto('library')} className="flex-1 items-center rounded-lg bg-slate-100 py-4 active:bg-slate-200">
+                <Pressable onPress={() => pickPhoto('library')} disabled={scanning} className="flex-1 items-center rounded-lg bg-slate-100 py-4 active:bg-slate-200 disabled:opacity-60">
                     <Text className="text-base font-semibold text-slate-900">Choose a Shelfie</Text>
                 </Pressable>
             </View>
