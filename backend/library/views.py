@@ -1,22 +1,22 @@
-import base64
 import io
 import logging
-from typing import Any
 
+from django.core.files.base import ContentFile
+from django.shortcuts import get_object_or_404
 from PIL import Image
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 
 from . import detection, matching, vlm
-from .models import LibraryBook
-from .serializers import LibraryBookSerializer
+from .models import LibraryBook, PendingDetection
+from .serializers import LibraryBookSerializer, PendingDetectionSerializer
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 # Real phone photos can be 3000px+ on a side. Downscaling before local
 # detection keeps YOLO inference fast and keeps VLM image-token cost
-# bounded, without meaningfully hurting spine legibility -- the crops
+# bounded, without meaningfully hurting spine legibility - the crops
 # sent on to the VLM are sub-regions anyway.
 MAX_PHOTO_DIMENSION: int = 1600
 
@@ -32,28 +32,10 @@ def _downscale(image: Image.Image) -> Image.Image:
     return image.resize((int(width * scale), int(height * scale)))
 
 
-def _encode_data_uri(image: Image.Image) -> str:
+def _crop_to_content_file(image: Image.Image) -> ContentFile:
     buf = io.BytesIO()
-    image.convert("RGB").save(buf, format="JPEG", quality=80)
-    encoded: str = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/jpeg;base64,{encoded}"
-
-
-def _serialize_match(match: matching.MatchResult) -> dict[str, Any]:
-    return {
-        "status": match.status,
-        "catalog_id": match.catalog_id,
-        "confidence": round(match.confidence, 3),
-        "candidates": [
-            {
-                "catalog_id": c.catalog_id,
-                "title": c.title,
-                "author": c.author,
-                "confidence": round(c.confidence, 3),
-            }
-            for c in match.candidates
-        ],
-    }
+    image.convert("RGB").save(buf, format="JPEG", quality=85)
+    return ContentFile(buf.getvalue(), name="crop.jpg")
 
 
 @api_view(["POST"])
@@ -91,24 +73,21 @@ def scan_photo(request: Request) -> Response:
         reads, vlm_meta = vlm.read_spines(crops)
         warnings.extend(vlm_meta["warnings"])
 
-        detections: list[dict[str, Any]] = []
-        for idx, (spine, read) in enumerate(zip(spines, reads)):
-            match_payload: dict[str, Any] | None = None
-            if read["read_status"] == "ok":
-                match_result = matching.match_book(read["title"], read["author"])
-                match_payload = _serialize_match(match_result)
-
-            detections.append({
-                "detection_id": idx,
-                "bbox": spine["bbox"],
-                "crop_thumbnail": _encode_data_uri(spine["crop"]),
-                "read_status": read["read_status"],
-                "ocr": {"title": read["title"], "author": read["author"]},
-                "match": match_payload,
-            })
+        # Every detection becomes a PendingDetection, whether it read
+        # successfully or not - a failed read still needs a human
+        # decision (manually enter it, or discard it), and persisting it
+        # means that decision can happen now or after reopening the app.
+        pending: list[PendingDetection] = []
+        for spine, read in zip(spines, reads):
+            pending.append(PendingDetection.objects.create(
+                crop_image=_crop_to_content_file(spine["crop"]),
+                read_status=read["read_status"],
+                ocr_title=read["title"],
+                ocr_author=read["author"],
+            ))
 
         return Response({
-            "detections": detections,
+            "detections": PendingDetectionSerializer(pending, many=True, context={"request": request}).data,
             "meta": {
                 "num_spines_detected": len(spines),
                 "local_model_latency_ms": local_model_latency_ms,
@@ -124,6 +103,37 @@ def scan_photo(request: Request) -> Response:
         # above as data, not an exception.
         logger.exception("Unhandled error while scanning photo")
         return Response({"error": "Something went wrong processing this photo."}, status=500)
+
+
+@api_view(["GET"])
+def pending_collection(request: Request) -> Response:
+    pending = PendingDetection.objects.all().order_by("created_at")
+    return Response({
+        "detections": PendingDetectionSerializer(pending, many=True, context={"request": request}).data,
+    })
+
+
+@api_view(["DELETE", "POST"])
+def pending_detail(request: Request, pending_id: int) -> Response:
+    pending = get_object_or_404(PendingDetection, id=pending_id)
+
+    if request.method == "DELETE":
+        # Discard: no status to track, the row just stops existing.
+        pending.crop_image.delete(save=False)
+        pending.delete()
+        return Response(status=204)
+
+    # POST: confirm -- request body is the user's final decision (title/
+    # author/etc, possibly hand-corrected). Creates the real LibraryBook,
+    # then this pending row's job is done.
+    serializer = LibraryBookSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    book = serializer.save()
+
+    pending.crop_image.delete(save=False)
+    pending.delete()
+
+    return Response(LibraryBookSerializer(book).data, status=201)
 
 
 @api_view(["GET", "POST"])

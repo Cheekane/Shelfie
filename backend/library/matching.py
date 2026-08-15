@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
+from typing import Any
 
 from rapidfuzz import fuzz, process
 
@@ -146,3 +147,24 @@ def match_book(ocr_title: str, ocr_author: str | None = None) -> MatchResult:
 
     # below the auto bar or two candidates are too close to call need human review
     return MatchResult(status="review", catalog_id=top.catalog_id, confidence=top.confidence, candidates=scored[:3])
+
+
+def serialize_match(match: MatchResult) -> dict[str, Any]:
+    """JSON-friendly dict for a MatchResult -- shared by views.py (the
+    scan response) and serializers.py (live-recomputed pending detections),
+    so both surfaces describe a match the same way.
+    """
+    return {
+        "status": match.status,
+        "catalog_id": match.catalog_id,
+        "confidence": round(match.confidence, 3),
+        "candidates": [
+            {
+                "catalog_id": c.catalog_id,
+                "title": c.title,
+                "author": c.author,
+                "confidence": round(c.confidence, 3),
+            }
+            for c in match.candidates
+        ],
+    }

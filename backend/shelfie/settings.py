@@ -132,6 +132,12 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+# Uploaded files (crop images for PendingDetection). MEDIA_ROOT is where
+# files actually get written on disk; MEDIA_URL is the URL prefix the
+# dev server uses to serve them back out.
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
