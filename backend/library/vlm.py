@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import io
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, TypedDict
 
 from google import genai
@@ -61,14 +63,20 @@ class ReadMeta(TypedDict):
     warnings: list[str]
 
 
-_client: genai.Client | None = None
+_thread_local = threading.local()
 
 
 def get_client() -> genai.Client:
-    global _client
-    if _client is None:
-        _client = genai.Client()
-    return _client
+    # One client per worker thread, not a shared global -- interactions.create()
+    # calls running concurrently on a single shared genai.Client() race on its
+    # underlying httpx connection (one thread's call closes it mid-flight for
+    # the others), surfacing as "Cannot send a request, as the client has
+    # been closed." Cheap to construct, so per-thread is the simple fix.
+    client = getattr(_thread_local, "client", None)
+    if client is None:
+        client = genai.Client()
+        _thread_local.client = client
+    return client
 
 
 def _encode_jpeg(image: Image.Image) -> str:
@@ -164,22 +172,29 @@ def read_spines(crops: list[Image.Image]) -> tuple[list[Read], ReadMeta]:
     if not crops:
         return [], {"vlm_latency_ms": 0, "vlm_calls": 0, "estimated_cost_usd": 0.0, "warnings": []}
 
+    chunks: list[list[Image.Image]] = [
+        crops[start : start + MAX_CROPS_PER_CALL] for start in range(0, len(crops), MAX_CROPS_PER_CALL)
+    ]
+
+    # Chunks are independent network calls, so run them concurrently instead
+    # of summing their latency -- a busy shelf with e.g. 4 chunks otherwise
+    # takes 4x as long as it needs to.
+    t0: float = time.monotonic()
+    with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
+        chunk_results = list(pool.map(_call_gemini, chunks))
+    wall_latency_ms: int = int((time.monotonic() - t0) * 1000)
+
     all_reads: list[Read] = []
-    total_latency_ms: int = 0
     total_cost: float = 0.0
     all_warnings: list[str] = []
-
-    for start in range(0, len(crops), MAX_CROPS_PER_CALL):
-        chunk = crops[start : start + MAX_CROPS_PER_CALL]
-        reads, latency_ms, cost, warnings = _call_gemini(chunk)
+    for reads, _latency_ms, cost, warnings in chunk_results:
         all_reads.extend(reads)
-        total_latency_ms += latency_ms
         total_cost += cost
         all_warnings.extend(warnings)
 
     meta: ReadMeta = {
-        "vlm_latency_ms": total_latency_ms,
-        "vlm_calls": (len(crops) + MAX_CROPS_PER_CALL - 1) // MAX_CROPS_PER_CALL,
+        "vlm_latency_ms": wall_latency_ms,
+        "vlm_calls": len(chunks),
         "estimated_cost_usd": round(total_cost, 6),
         "warnings": all_warnings,
     }
