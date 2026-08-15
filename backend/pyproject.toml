@@ -9,4 +9,5 @@ dependencies = [
     "djangorestframework>=3.18.0",
     "pillow>=12.3.0",
     "python-dotenv>=1.2.2",
+    "rapidfuzz>=3.14.5",
 ]
