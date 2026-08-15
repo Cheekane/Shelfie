@@ -9,21 +9,21 @@ The pipeline: a local object-detection model finds book spines in the photo, a h
 ```
 mobile/                      Expo Router app (React Native)
   app/(tabs)/
-    index.tsx                 Dashboard: two summary cards (Library, Needs Review)
-    shelfie.tsx                Capture/pick a photo, POST to /api/scan/
-    library.tsx                 Confirmed books, paginated + infinite scroll
-    review.tsx                   Pending detections: confirm/correct/discard
-  components/                  PendingBookCard, LibraryBookCard, EmptyState, Header, Section
-  lib/api.ts                   Typed fetch client, single source of truth for API_BASE_URL
-  types/api.ts                 TypeScript types mirroring the backend's serializers
+    index.tsx                   Contains two summary cards (Library, Needs Review)
+    shelfie.tsx                 Take/pick a photo, POST to /api/scan/
+  library.tsx                   Confirmed books, paginated + infinite scroll
+    review.tsx                  Pending detections: confirm/correct/discard
+  components/                   PendingBookCard, LibraryBookCard, EmptyState, Header, Section
+  lib/api.ts                    Typed fetch client, single source of truth for API_BASE_URL
+  types/api.ts                  TypeScript types mirroring the backend's serializers
 
 backend/                     Django + Django REST Framework
   library/
-    models.py                  LibraryBook (confirmed), PendingDetection (needs review)
+    models.py                   LibraryBook (confirmed), PendingDetection (needs review)
     catalog.py                  Loads catalog.csv into memory once per process, no DB table
-    detection.py                 YOLOv8n wrapper -- local object detection, CPU
-    vlm.py                        Gemini wrapper -- reads title/author off each spine crop
-    matching.py                   Normalization + fuzzy scoring + confidence thresholds
+    detection.py                YOLOv8n wrapper -- local object detection, CPU
+    vlm.py                      Gemini wrapper -- reads title/author off each spine crop
+    matching.py                 Normalization + fuzzy scoring + confidence thresholds
     views.py, serializers.py, urls.py
   tests/test_matching.py        17 tests covering the matcher's messy-catalog cases
 ```
@@ -53,30 +53,30 @@ Get a free-tier Gemini API key at [ai.google.dev](https://ai.google.dev). The YO
 ### Mobile
 
 ```bash
-cd mobile
-npm install
+cd mobile                   # go to the mobile (frontend directory)
+npm install                 # install required dependencies
 cp .env.example .env        # then set EXPO_PUBLIC_API_URL to your computer's LAN IP
-npx expo start
+npx expo start              # start the mobile frontend
 ```
 
-`EXPO_PUBLIC_API_URL` needs your computer's actual LAN IP (e.g. `http://10.0.0.171:8000`), not `localhost` -- on a physical phone, `localhost` resolves to the phone itself, not your computer. Find your Mac's LAN IP with `ipconfig getifaddr en0`. iOS Simulator can use `localhost` directly since it shares the host's network stack; Android Emulator needs `http://10.0.2.2:8000`.
+`EXPO_PUBLIC_API_URL` needs your computer's actual LAN IP (e.g. `http://10.0.0.171:8000`), not `localhost` on a physical phone, `localhost` resolves to the phone itself, not your computer. Find your Mac's LAN IP with `ipconfig getifaddr en0`. iOS Simulator can use `localhost` directly since it shares the host's network stack; Android Emulator needs `http://10.0.2.2:8000`.
 
 Scan the QR code Expo prints with Expo Go, or press `i`/`a` for a simulator.
 
 ### Tests
 
 ```bash
-cd backend
-uv run python manage.py test
+cd backend                        # go the backend directory
+uv run python manage.py test      # test
 ```
 
 ## How matching works
 
-`matching.py` is deliberately not "AI" in the ML sense -- it's heuristic fuzzy string matching (`rapidfuzz`), contrasted with the two real trained models in the pipeline (YOLO for detection, Gemini for reading). The design leans toward false negatives over false positives: an uncertain match should go to human review, not get silently saved as if it were certain.
+`matching.py` uses heuristic fuzzy string matching (`rapidfuzz`), with the two real trained models in the pipeline (YOLO for detection, Gemini for reading). The design leans toward false negatives over false positives. An uncertain match should go to human review instead of being marked as certain.
 
-1. **Normalize.** Titles: strip diacritics (NFKD decomposition), lowercase, strip a leading "the/a/an," strip punctuation. Authors: detect and reverse `"Lastname, Firstname"` form, strip periods from initials.
-2. **Candidate generation (real blocking, not brute force).** The catalog is flattened into `(catalog_id, title_variant)` pairs -- every entry in a book's `alt_titles` becomes its own searchable row, so a US/UK title variant is matchable without extra logic. `rapidfuzz.process.extract` scans the OCR'd title against every variant and returns the top ~24 hits, deduplicated back down to each book's single best-scoring variant, giving 8 shortlisted candidates.
-3. **Composite score on the shortlist only.** `0.7 * title_similarity + 0.3 * author_similarity` (using `WRatio` for titles, `token_sort_ratio` for authors), plus a small bonus when one title is a substring of the other (the omnibus vs. individual-volume case). With no author read at all, title similarity alone gets weighted at 0.85 instead -- an honest limitation, not a fake fix: string similarity genuinely cannot resolve "J.K." vs. "Joanne."
+1. **Normalize.** Titles are strip diacritics, lowercase, strip a leading "the/a/an," strip punctuation. Author names are detected and reversed `"Lastname, Firstname"`, strip periods from initials.
+2. **Candidate generation.** The catalog is flattened into `(catalog_id, title_variant)` pairs, every entry in a book's `alt_titles` becomes its own searchable row, so a US/UK title variant is matchable without extra logic. `rapidfuzz.process.extract` scans the OCR'd title against every variant and returns the top ~24 hits, deduplicated back down to each book's single best-scoring variant, giving 8 shortlisted candidates.
+3. **Composite score.** `0.7 * title_similarity + 0.3 * author_similarity` (using `WRatio` for titles, `token_sort_ratio` for authors), plus a small bonus when one title is a substring of the other (the omnibus vs. individual-volume case). With no author read at all, title similarity alone gets weighted at 0.85 instead -- an honest limitation, not a fake fix: string similarity genuinely cannot resolve "J.K." vs. "Joanne."
 4. **Ambiguity forces review.** If the top two candidates' scores land within 0.05 of each other, the result is forced to `"review"` even if the top score alone would clear the auto-add bar, and both candidates are surfaced. This is what handles two different catalog entries sharing a title.
 5. **Thresholds** (heuristic starting points, not derived from a labeled dataset -- stated plainly, not dressed up): `>= 0.87` auto-adds, `0.60-0.87` goes to review, `< 0.60` is unmatched.
 
@@ -107,6 +107,7 @@ VLM cost is computed from the Interactions API's real reported token usage (`usa
 
 ## Known limitations
 
+- **The app only recognizes books already in `catalog.csv`.** Matching is entirely catalog-relative -- there's no external book database lookup, so a book that isn't one of the catalog's 123 entries will always resolve to `"unmatched"`, regardless of how clearly the VLM reads its spine. The fallback is the review screen's manual title/author entry (saved with `match_status_at_add: "manual"`, `catalog_id: null`), not a smarter match. This is a real architectural boundary, not a bug -- worth knowing going in, since it shapes what "the app didn't recognize this book" actually means.
 - **YOLO's COCO `book` class isn't spine-specific.** It can produce coarse boxes on a dense, tightly-packed shelf. A model fine-tuned on book spines specifically would do better; out of scope for the time available here.
 - **Author matching can't resolve initials vs. full names** ("J.K." vs. "Joanne") from string similarity alone -- title-weighting is the honest mitigation, not a fix.
 - **Confidence thresholds are heuristic**, tuned by eye against test photos and the deliberately-messy catalog, not fit against a labeled dataset.
