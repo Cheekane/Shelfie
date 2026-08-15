@@ -14,16 +14,17 @@ MAX_CROPS_PER_CALL: int = 12
 TIMEOUT_SECONDS: int = 20
 
 # Gemini 3.6 Flash paid-tier pricing (ai.google.dev/gemini-api/docs/pricing),
-# in effect through 2026-12-31. Thinking tokens are billed as output tokens.
 INPUT_PRICE_PER_1M_TOKENS: float = 0.75
 OUTPUT_PRICE_PER_1M_TOKENS: float = 3.75
 
 PROMPT_TEXT: str = (
     "You are reading book spines cropped from a bookshelf photo, given in "
     "index order (0, 1, 2, ...). For each image, read the title and author "
-    "printed on the spine. If a spine is not legible -- blurry, obscured, "
-    "cut off, or you are not confident -- set legible to false and leave "
-    "title/author as empty strings rather than guessing."
+    "printed on the spine. If a spine is not legible - blurry, obscured, "
+    "cut off, or you are not confident - set legible to false and leave "
+    "title/author as empty strings rather than guessing. Note that there "
+    "can be images that aren't actually books/spines. There can also be "
+    "other text on the spine other than the title and author."
 )
 
 RESPONSE_SCHEMA: dict[str, Any] = {
