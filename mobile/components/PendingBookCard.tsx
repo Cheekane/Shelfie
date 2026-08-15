@@ -1,5 +1,17 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, Text, TextInput, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    Text,
+    TextInput,
+    View,
+    useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ApiError, confirmPending, discardPending } from '../lib/api';
 import type { MatchStatusAtAdd, PendingDetection } from '../types/api';
@@ -48,6 +60,9 @@ export function PendingBookCard({ detection, onConfirmed, onDiscarded }: Pending
     const [confidence, setConfidence] = useState<number | null>(topCandidate?.confidence ?? null);
     const [corrected, setCorrected] = useState<boolean>(false);
     const [busy, setBusy] = useState<boolean>(false);
+    const [imageExpanded, setImageExpanded] = useState<boolean>(false);
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+    const insets = useSafeAreaInsets();
 
     const badge = badgeFor(detection, corrected);
     const candidates = detection.match?.candidates ?? [];
@@ -107,7 +122,9 @@ export function PendingBookCard({ detection, onConfirmed, onDiscarded }: Pending
     return (
         <View className="w-full gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <View className="flex-row gap-3">
-                <Image source={{ uri: detection.crop_image }} className="h-24 w-16 rounded-lg bg-slate-100" resizeMode="cover" />
+                <Pressable onPress={() => setImageExpanded(true)}>
+                    <Image source={{ uri: detection.crop_image }} className="h-32 w-20 rounded-lg bg-slate-100" resizeMode="cover" />
+                </Pressable>
                 <View className="flex-1 gap-2">
                     <View className={`self-start rounded-full px-2 py-1 ${badge.bgClass}`}>
                         <Text className={`text-xs font-semibold ${badge.textClass}`}>{badge.label}</Text>
@@ -135,6 +152,37 @@ export function PendingBookCard({ detection, onConfirmed, onDiscarded }: Pending
                     <Text className="font-semibold text-slate-900">Discard</Text>
                 </Pressable>
             </View>
+
+            <Modal visible={imageExpanded} transparent animationType="fade" onRequestClose={() => setImageExpanded(false)}>
+                <Pressable
+                    onPress={() => setImageExpanded(false)}
+                    className="flex-1 items-center justify-center bg-black/90"
+                >
+                    {/* Pinch-to-zoom via ScrollView's native zoom (iOS); on
+                        Android this still shows the crop full-size, just
+                        without pinch, which is the honest platform limit. */}
+                    <ScrollView
+                        maximumZoomScale={4}
+                        minimumZoomScale={1}
+                        centerContent
+                        style={{ width: screenWidth, height: screenHeight }}
+                        contentContainerStyle={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Image
+                            source={{ uri: detection.crop_image }}
+                            style={{ width: screenWidth - 32, height: screenHeight - insets.top - insets.bottom - 32 }}
+                            resizeMode="contain"
+                        />
+                    </ScrollView>
+                    <Pressable
+                        onPress={() => setImageExpanded(false)}
+                        className="absolute rounded-full bg-white/20 px-4 py-2"
+                        style={{ top: insets.top + 12, right: 20 }}
+                    >
+                        <Text className="text-base font-semibold text-white">Close</Text>
+                    </Pressable>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
