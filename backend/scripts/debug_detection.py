@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from library.detection import detect_spines  # noqa: E402
+from library.detection import detect_spines
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "debug_output"
 
