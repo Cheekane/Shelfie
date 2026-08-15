@@ -53,7 +53,13 @@ interface PendingBookCardProps {
 }
 
 export function PendingBookCard({ detection, onConfirmed, onDiscarded }: PendingBookCardProps) {
-    const topCandidate = detection.match?.candidates[0] ?? null;
+    // "unmatched" still carries candidates (matching.py's best sub-threshold
+    // guess), but they didn't clear the bar to actually match -- pre-filling
+    // the form with one anyway would silently swap in a wrong catalog book's
+    // title for something that's genuinely not in the catalog. Only "auto"
+    // and "review" represent a real candidate worth defaulting to.
+    const isActionableMatch = detection.match?.status === 'auto' || detection.match?.status === 'review';
+    const topCandidate = isActionableMatch ? (detection.match?.candidates[0] ?? null) : null;
     const [title, setTitle] = useState<string>(topCandidate?.title ?? detection.ocr_title);
     const [author, setAuthor] = useState<string>(topCandidate?.author ?? detection.ocr_author);
     const [catalogId, setCatalogId] = useState<string | null>(topCandidate?.catalog_id ?? null);
