@@ -21,6 +21,14 @@ export default function TabsLayout() {
                     tabBarIcon: ({ color, size }) => <Ionicons name="camera-outline" color={color} size={size} />,
                 }}
             />
+            {/* Pushed to from the Library dashboard, not tab-bar
+                destinations themselves -- href: null keeps them out of the
+                tab bar's buttons while still living inside this Tabs
+                navigator, which is what keeps the bottom bar visible while
+                they're on screen (a sibling route outside (tabs) would
+                hide it entirely). */}
+            <Tabs.Screen name="review" options={{ href: null }} />
+            <Tabs.Screen name="library" options={{ href: null }} />
         </Tabs>
     );
 }
