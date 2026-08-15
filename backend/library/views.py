@@ -9,7 +9,9 @@ from .serializers import LibraryBookSerializer
 @api_view(["GET", "POST"])
 def library_collection(request: Request) -> Response:
     if request.method == "GET":
+        # queries all library books
         books = LibraryBook.objects.all()
+        # serializes then sends the data
         return Response({"books": LibraryBookSerializer(books, many=True).data})
 
     # POST: confirm a batch of books into the library.
