@@ -4,8 +4,8 @@ import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# library/catalog.py -> library/ -> backend/ -> repo root -> catalog.csv
-CATALOG_PATH = Path(__file__).resolve().parent.parent.parent / "catalog.csv"
+# library/catalog.py -> library/ -> backend/ -> catalog.csv
+CATALOG_PATH: Path = Path(__file__).resolve().parent.parent / "catalog.csv"
 
 
 @dataclass(frozen=True)
