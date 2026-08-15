@@ -94,16 +94,17 @@ def _score_candidate(ocr_title: str, ocr_author: str | None, entry: catalog.Cata
 
 
 def _generate_candidate_ids(ocr_title: str, limit: int = 8) -> list[str]:
-    # Stage 1: fuzzy-search the OCR title against every known title
     # variant (flattened, across the whole catalog) to cheaply narrow
     # 123 books down to a handful of plausible candidates.
     norm_ocr_title = normalize_title(ocr_title)
     variants = catalog.get_title_variants()
     choices = [normalize_title(v.title_text) for v in variants]
 
+    # fuzzy search scans the OCR title against all the catalog titles
+    # then returns limit (8) * 3 = 24 matches
     matches = process.extract(norm_ocr_title, choices, scorer=fuzz.WRatio, limit=limit * 3)
 
-    # A book can win via more than one of its variants -- keep only its
+    # A book can win via more than one of its variants - keep only its
     # best-scoring hit before ranking, so it doesn't appear twice.
     best_score_by_id: dict[str, float] = {}
     for _, score, idx in matches:
@@ -122,7 +123,7 @@ def match_book(ocr_title: str, ocr_author: str | None = None) -> MatchResult:
     entries = catalog.get_entries()
     candidate_ids = _generate_candidate_ids(ocr_title)
 
-    # Stage 2: precisely score just the shortlist (title + author both).
+    # precisely score just the shortlist (title + author both).
     scored = [
         Candidate(
             catalog_id=cid,
@@ -143,6 +144,5 @@ def match_book(ocr_title: str, ocr_author: str | None = None) -> MatchResult:
     if top.confidence >= AUTO_THRESHOLD and not is_ambiguous:
         return MatchResult(status="auto", catalog_id=top.catalog_id, confidence=top.confidence, candidates=[top])
 
-    # Either below the auto bar, or two candidates are too close to call
-    # -- both cases route to human review rather than silently guessing.
+    # below the auto bar or two candidates are too close to call need human review
     return MatchResult(status="review", catalog_id=top.catalog_id, confidence=top.confidence, candidates=scored[:3])
