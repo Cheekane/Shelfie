@@ -133,6 +133,7 @@ VLM cost is computed from the API's real reported token usage (`usage.total_inpu
 - **Author matching can't resolve initials vs. full names** Different designs can have different aliases for the author name ("J.K." vs. "Joanne"). So, title-weighting is important, but clearly not a fix.
 - **Confidence thresholds are heuristic.** The confidence thresholds were manually tuned from short trial and error. So, it's highly likely that the thresholds aren't optimally tuned.
 - **A failed VLM batch loses every spine in that batch.** This is the tradeoff for efficient processing. It's mitigated by keeping batch sizes small.
+- **YOLO can detect the same physical spine twice as overlapping boxes**, seen on a real bookshelf photo where one book showed up as two separate pending entries. Neither box gets suppressed, so it reaches review as a duplicate rather than getting merged or discarded automatically.
 
 ## What I'd do with another day
 
