@@ -68,6 +68,17 @@ cd backend                        # go the backend directory
 uv run python manage.py test      # test
 ```
 
+## Building the catalog
+
+There are 123 entries in `catalog.csv`, weighted toward books people actually own (Harry Potter, Tolkien, classics, popular contemporary fiction), not obscure titles nothing would match against. Deliberately messy, not clean, on purpose:
+
+- Two editions of the same book as separate rows (`c001`/`c002`, both "The Hobbit").
+- A US/UK title difference via `alt_titles` (`c007`, "...Philosopher's Stone" / "...Sorcerer's Stone").
+- Two genuinely different books sharing a title (`c021`/`c022`, "The Alchemist" by Coelho vs. Michael Scott).
+- An omnibus alongside its individual volumes (`c006` "The Lord of the Rings" containing `c003`/`c004`/`c005`).
+- Titles that are substrings of each other (`c018`/`c019`/`c020`, "Dune" / "Dune Messiah" / "Children of Dune").
+- Author names in multiple forms: `Lastname, Firstname` (`c028`, "Orwell, George"), initials (`c003`, "J.R.R. Tolkien"), transliteration (`c026`, "Dostoyevsky, Fyodor" vs. the more common "Fyodor Dostoevsky"), accents (`c023`, "García Márquez").
+
 ## How matching works
 
 `matching.py` uses heuristic fuzzy string matching (`rapidfuzz`), with the two real trained models in the pipeline (YOLO for detection, Gemini for reading). The design leans toward false negatives over false positives. An uncertain match should go to human review instead of being marked as certain.
@@ -122,6 +133,15 @@ VLM cost is computed from the API's real reported token usage (`usage.total_inpu
 - **Author matching can't resolve initials vs. full names** Different designs can have different aliases for the author name ("J.K." vs. "Joanne"). So, title-weighting is important, but clearly not a fix.
 - **Confidence thresholds are heuristic.** The confidence thresholds were manually tuned from short trial and error. So, it's highly likely that the thresholds aren't optimally tuned.
 - **A failed VLM batch loses every spine in that batch.** This is the tradeoff for efficient processing. It's mitigated by keeping batch sizes small.
+
+## What I'd do with another day
+
+- Add an author-only matching fallback for when the title is unreadable but the author isn't. Right now that case just returns unmatched with nothing to work with, discarding real information.
+- Tighten the word-order-insensitivity gap in title matching so two different books with swapped-word titles don't get conflated (see `test_reordered_title_words_still_matches_known_limitation`).
+- Fine-tune or swap in a model trained on book spines specifically, instead of general-purpose COCO `book`, which produces coarse boxes on a packed shelf.
+- Tune confidence thresholds against a real labeled dataset instead of by eye against test photos.
+- Add a task queue and rate-limit-aware batching for the VLM calls, needed before this could handle real volume (came up directly in the cost-at-scale numbers above).
+- Add the "one word changed, different book" test case (e.g. two similar but distinct titles) properly, with catalog rows built for it, instead of skipping it for time.
 
 ## API reference
 
