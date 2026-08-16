@@ -118,13 +118,15 @@ VLM cost is computed from the API's real reported token usage (`usage.total_inpu
 
 ### Cost at scale
 
-(~$0.000963/book, ~41 books/photo):
+Books-per-photo assumption: ~13, measured across 5 real photos of my own shelves (`backend/test_photos/bs1.jpg`-`bs5.jpg`, 4-22 spines each). Landscape photos of one shelf/row read better than one wide shot of a whole bookcase, so this is closer to how someone would actually use the app than the earlier 41-book estimate (one dense, wide test photo).
+
+(~$0.000963/book, ~13 books/photo):
 
 | Books scanned | Photos | Estimated VLM cost |
 |---|---|---|
-| 1,000 | 24 | ~$0.96 |
-| 100,000 | 2,439 | ~$96.31 |
-| 1,000,000 | 24,390 | ~$963.10 |
+| 1,000 | ~77 | ~$0.96 |
+| 100,000 | ~7,692 | ~$96.31 |
+| 1,000,000 | ~76,923 | ~$963.10 |
 
 ## Known limitations
 
