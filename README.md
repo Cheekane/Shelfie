@@ -70,14 +70,14 @@ uv run python manage.py test      # test
 
 ## Building the catalog
 
-There are 123 entries in `catalog.csv`, weighted toward books people actually own (Harry Potter, Tolkien, classics, popular contemporary fiction), not obscure titles nothing would match against. Deliberately messy, not clean, on purpose:
+There are 123 entries in `catalog.csv`, weighted toward books people actually have. Deliberately messy, not clean, on purpose:
 
 - Two editions of the same book as separate rows (`c001`/`c002`, both "The Hobbit").
 - A US/UK title difference via `alt_titles` (`c007`, "...Philosopher's Stone" / "...Sorcerer's Stone").
 - Two genuinely different books sharing a title (`c021`/`c022`, "The Alchemist" by Coelho vs. Michael Scott).
 - An omnibus alongside its individual volumes (`c006` "The Lord of the Rings" containing `c003`/`c004`/`c005`).
 - Titles that are substrings of each other (`c018`/`c019`/`c020`, "Dune" / "Dune Messiah" / "Children of Dune").
-- Author names in multiple forms: `Lastname, Firstname` (`c028`, "Orwell, George"), initials (`c003`, "J.R.R. Tolkien"), transliteration (`c026`, "Dostoyevsky, Fyodor" vs. the more common "Fyodor Dostoevsky"), accents (`c023`, "García Márquez").
+- Author names in multiple forms: `Lastname, Firstname` (`c028`, "Orwell, George"), initials (`c006`, "J.R.R. Tolkien"), transliteration (`c026`, "Dostoyevsky, Fyodor" vs. the more common "Fyodor Dostoevsky"), accents (`c023`, "García Márquez").
 
 ## How matching works
 
