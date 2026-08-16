@@ -1,5 +1,6 @@
 import io
 import logging
+import uuid
 from typing import Any
 
 from django.core.files.base import ContentFile
@@ -65,9 +66,17 @@ def _downscale(image: Image.Image) -> Image.Image:
 
 
 def _crop_to_content_file(image: Image.Image) -> ContentFile:
+    # A fixed name like "crop.jpg" is fine for the storage backend (it
+    # appends a random suffix on collision), but not for the client: once
+    # an old crop at that exact URL gets deleted (confirm/discard), the
+    # next photo's first crop can land back on the same bare filename,
+    # reusing the same URL for entirely different image bytes. The phone's
+    # image cache has no way to know the file behind that URL changed, so
+    # it keeps showing the old picture. A always-unique name means the URL
+    # is never reused, so there's nothing for a cache to get wrong.
     buf = io.BytesIO()
     image.convert("RGB").save(buf, format="JPEG", quality=85)
-    return ContentFile(buf.getvalue(), name="crop.jpg")
+    return ContentFile(buf.getvalue(), name=f"crop_{uuid.uuid4().hex}.jpg")
 
 
 @api_view(["POST"])
