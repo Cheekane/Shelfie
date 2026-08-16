@@ -10,7 +10,7 @@ These shaped most of the engineering decisions below, stated up front so the "wh
 
 - **The catalog is fixed and known ahead of time**, not an open lookup against every book that exists. Shapes the whole matching design: a static, in-memory catalog instead of a real book database or external lookup.
 - **False positives are worse than false negatives.** An uncertain match should reach the user for review, not get silently auto-confirmed. Shapes the confidence thresholds and the ambiguity/tie-breaking logic.
-- **Users take landscape photos of one shelf/row, not a whole bookcase in one shot**, for better spine legibility. Shapes the books-per-photo assumption in the cost table.
+- **Users take vertical photos**, not a wide landscape shot of a whole bookcase. Modern phone cameras are high-resolution enough that a vertical frame still reads spines clearly while covering more of a shelf.
 - **This is single-user, local-first, and not deployed.** No auth, no multi-tenancy, SQLite instead of a real database, matching what the spec says isn't graded.
 - **Occasional VLM rate-limiting is an acceptable risk on a free/spend-capped key at demo scale.** Real backpressure (a task queue) is scoped as future work, not built now.
 - **One photo per scan request**, matching the flow described in the task spec, not a multi-photo batch upload.
@@ -129,15 +129,13 @@ VLM cost is computed from the API's real reported token usage (`usage.total_inpu
 
 ### Cost at scale
 
-Books-per-photo assumption: ~13, measured across 5 real photos of my own shelves (`backend/test_photos/bs1.jpg`-`bs5.jpg`, 4-22 spines each). Landscape photos of one shelf/row read better than one wide shot of a whole bookcase, so this is closer to how someone would actually use the app than the earlier 41-book estimate (one dense, wide test photo).
+Measured per book (~$0.000963), not per photo, since photo composition (how many shelves/books someone frames in one shot) is a much shakier assumption than the actual per-book VLM cost:
 
-(~$0.000963/book, ~13 books/photo):
-
-| Books scanned | Photos | Estimated VLM cost |
-|---|---|---|
-| 1,000 | ~77 | ~$0.96 |
-| 100,000 | ~7,692 | ~$96.31 |
-| 1,000,000 | ~76,923 | ~$963.10 |
+| Books scanned | Estimated VLM cost |
+|---|---|
+| 1,000 | ~$0.96 |
+| 100,000 | ~$96.31 |
+| 1,000,000 | ~$963.10 |
 
 ## Known limitations
 
