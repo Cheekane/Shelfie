@@ -4,6 +4,17 @@ Photograph a bookshelf, get back a reviewed, confirmed list of books added to yo
 
 The pipeline is made up by a local object-detection model finds book spines in the photo, a hosted vision-language model reads the title/author off each spine, a fuzzy matcher scores each read against a catalog, and anything the matcher isn't confident about goes to a human review screen before it's saved.
 
+## Assumptions
+
+These shaped most of the engineering decisions below, stated up front so the "why" is clear before the "what":
+
+- **The catalog is fixed and known ahead of time**, not an open lookup against every book that exists. Shapes the whole matching design: a static, in-memory catalog instead of a real book database or external lookup.
+- **False positives are worse than false negatives.** An uncertain match should reach the user for review, not get silently auto-confirmed. Shapes the confidence thresholds and the ambiguity/tie-breaking logic.
+- **Users take landscape photos of one shelf/row, not a whole bookcase in one shot**, for better spine legibility. Shapes the books-per-photo assumption in the cost table.
+- **This is single-user, local-first, and not deployed.** No auth, no multi-tenancy, SQLite instead of a real database, matching what the spec says isn't graded.
+- **Occasional VLM rate-limiting is an acceptable risk on a free/spend-capped key at demo scale.** Real backpressure (a task queue) is scoped as future work, not built now.
+- **One photo per scan request**, matching the flow described in the task spec, not a multi-photo batch upload.
+
 ## Architecture
 
 ```
