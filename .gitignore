@@ -27,3 +27,6 @@ web-build/
 # Editors
 .vscode/
 .idea/
+
+# Personal study notes, not a deliverable
+Shelfie-Study-Notes.md
