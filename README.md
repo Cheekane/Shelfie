@@ -136,11 +136,11 @@ VLM cost is computed from the API's real reported token usage (`usage.total_inpu
 
 ## What I'd do with another day
 
-- Add an author-only matching fallback for when the title is unreadable but the author isn't. Right now that case just returns unmatched with nothing to work with, discarding real information.
-- Tighten the word-order-insensitivity gap in title matching so two different books with swapped-word titles don't get conflated (see `test_reordered_title_words_still_matches_known_limitation`).
-- Fine-tune or swap in a model trained on book spines specifically, instead of general-purpose COCO `book`, which produces coarse boxes on a packed shelf.
-- Tune confidence thresholds against a real labeled dataset instead of by eye against test photos.
-- Add a task queue and rate-limit-aware batching for the VLM calls, needed before this could handle real volume (came up directly in the cost-at-scale numbers above).
+- There might be a way to be more efficient in matching by narrowing down the search. For example, if the author of a book can be read and matched, then we could simply narrow down the search for the matching title for all books in the catalog by that author.
+- Tighten the word-order-insensitivity gap in title matching so two different books with swapped-word titles don't get matched.
+- Fine-tune or swap in a model trained on book spines specifically, instead of general-purpose COCO `book`, which produces rough boxes on a packed shelf.
+- Tune confidence thresholds against a real labeled dataset instead of using trial and error with test photos.
+- Add a task queue (e.g. Celery + Redis) in front of the VLM work. `/api/scan/` currently holds one server worker per request for the full 8-20s; under real concurrent load, workers run out and users end up idling behind an overloaded server instead of their photo being processed.
 - Add the "one word changed, different book" test case (e.g. two similar but distinct titles) properly, with catalog rows built for it, instead of skipping it for time.
 
 ## API reference
