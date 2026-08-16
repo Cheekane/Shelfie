@@ -41,7 +41,7 @@ export default function ScanScreen() {
         try {
             await scanPhoto(imageUri);
             setImageUri(null);
-            // Scan results land as PendingDetection rows on the backend --
+            // Scan results land as PendingDetection rows on the backend
             // go straight to reviewing them instead of the Library summary.
             router.push('/review');
         } catch (err) {
