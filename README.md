@@ -2,7 +2,7 @@
 
 Photograph a bookshelf, get back a reviewed, confirmed list of books added to your personal library.
 
-The pipeline: a local object-detection model finds book spines in the photo, a hosted vision-language model reads the title/author off each spine, a fuzzy matcher scores each read against a catalog, and anything the matcher isn't confident about goes to a human review screen before it's saved.
+The pipeline is made up by a local object-detection model finds book spines in the photo, a hosted vision-language model reads the title/author off each spine, a fuzzy matcher scores each read against a catalog, and anything the matcher isn't confident about goes to a human review screen before it's saved.
 
 ## Architecture
 
@@ -21,16 +21,14 @@ backend/                     Django + Django REST Framework
   library/
     models.py                   LibraryBook (confirmed), PendingDetection (needs review)
     catalog.py                  Loads catalog.csv into memory once per process, no DB table
-    detection.py                YOLOv8n wrapper -- local object detection, CPU
-    vlm.py                      Gemini wrapper -- reads title/author off each spine crop
+    detection.py                YOLOv8n wrapper - local object detection, uses CPU
+    vlm.py                      Gemini wrapper - reads title/author off each spine crop
     matching.py                 Normalization + fuzzy scoring + confidence thresholds
     views.py, serializers.py, urls.py
-  tests/test_matching.py        17 tests covering the matcher's messy-catalog cases
+  tests/test_matching.py        22 tests covering the matcher's messy-catalog cases
 ```
 
-**Why no catalog database table.** `catalog.csv` is static and ships in the repo -- it never changes at runtime, so modeling it as a DB table would need a migration and an import step for no product benefit. `catalog.py` loads it into memory once per process and caches it. `LibraryBook.catalog_id` is a plain string reference to a CSV row's `id` column, not a real foreign key, since the catalog isn't a table.
-
-**Why `PendingDetection` stores almost nothing derived.** A row existing in this table *is* the "needs review" signal -- there's no status field. Confirming a detection copies it into `LibraryBook` and deletes the row; discarding just deletes the row. Match info (candidates, confidence) isn't stored either -- `matching.py` is cheap and deterministic, so it's recomputed live from `ocr_title`/`ocr_author` every time a pending row is fetched, rather than risking a stale cached score.
+**Why `PendingDetection` stores almost nothing derived.** A row existing in this table *is* the "needs review" signal. Confirming a detection copies it into `LibraryBook` and deletes the row and discarding deletes the row. Match info (candidates, confidence) isn't stored either, since `matching.py` is cheap and deterministic, so it's recomputed live from `ocr_title`/`ocr_author` every time a pending row is fetched, rather than risking a stale cached score.
 
 ## Setup
 
@@ -41,9 +39,9 @@ Requires Python 3.12+ (pinned for ML library compatibility), [uv](https://docs.a
 ```bash
 cd backend
 uv sync
-cp .env.example .env        # then fill in GEMINI_API_KEY
+cp .env.example .env                              # then fill in GEMINI_API_KEY
 uv run python manage.py migrate
-uv run python manage.py runserver 0.0.0.0:8000
+uv run python manage.py runserver 0.0.0.0:8000    # start the backend server
 ```
 
 Binding to `0.0.0.0` (not the default `127.0.0.1`) matters for testing on a physical phone -- `0.0.0.0` tells Django to accept connections on every network interface, not just the loopback one a phone can't reach.
@@ -76,21 +74,23 @@ uv run python manage.py test      # test
 
 1. **Normalize.** Titles are strip diacritics, lowercase, strip a leading "the/a/an," strip punctuation. Author names are detected and reversed `"Lastname, Firstname"`, strip periods from initials.
 2. **Candidate generation.** The catalog is flattened into `(catalog_id, title_variant)` pairs, every entry in a book's `alt_titles` becomes its own searchable row, so a US/UK title variant is matchable without extra logic. `rapidfuzz.process.extract` scans the OCR'd title against every variant and returns the top ~24 hits, deduplicated back down to each book's single best-scoring variant, giving 8 shortlisted candidates.
-3. **Composite score.** `0.7 * title_similarity + 0.3 * author_similarity` (using `WRatio` for titles, `token_sort_ratio` for authors), plus a small bonus when one title is a substring of the other (the omnibus vs. individual-volume case). With no author read at all, title similarity alone gets weighted at 0.85 instead -- an honest limitation, not a fake fix: string similarity genuinely cannot resolve "J.K." vs. "Joanne."
-4. **Ambiguity forces review.** If the top two candidates' scores land within 0.05 of each other, the result is forced to `"review"` even if the top score alone would clear the auto-add bar, and both candidates are surfaced. This is what handles two different catalog entries sharing a title.
-5. **Thresholds** (heuristic starting points, not derived from a labeled dataset -- stated plainly, not dressed up): `>= 0.87` auto-adds, `0.60-0.87` goes to review, `< 0.60` is unmatched.
+3. **Composite score.** `0.7 * title_similarity + 0.3 * author_similarity` (using `WRatio` for titles, `token_sort_ratio` for authors), plus a small bonus when one title is a substring of the other. If no author was read, the title similarity alone gets weighted at 0.85 instead, not a fake fix.
+4. **Ambiguity forces review.** If the top two candidates' scores land within 0.05 of each other, the result is forced to `"review"` even if the top score alone would clear the auto-add bar, and both candidates are considered. This is what handles two different catalog entries sharing a title.
+5. **Thresholds** (heuristic starting points, not derived from a labeled dataset): `>= 0.87` auto-adds, `0.60-0.87` goes to review, `< 0.60` is unmatched.
 
-17 tests in `backend/tests/test_matching.py` cover: accent stripping, leading-article stripping, `Lastname, Firstname` reordering, initials punctuation, exact match, US/UK title variants via `alt_titles`, transliterated/accented authors, two editions of the same book forcing review instead of guessing, shared titles disambiguated by author, shared titles *without* an author forcing review, omnibus vs. individual volume, no-author confidence penalty, and pure garbage input resolving to unmatched rather than a false positive.
+22 tests in `backend/tests/test_matching.py` cover: accent stripping, article/initials normalization, exact match, US/UK title variants, transliterated/accented authors, editions and shared titles forcing review, omnibus vs. individual volume, no-author matching, author aliases, OCR typos, and garbage input. Two more document known limitations rather than correctness: reordered titles still match (word-order-insensitive), and an unreadable title with a known author stays unmatched (no author-only fallback).
 
-## Local detection + VLM reading
+## Local detection
 
-**Detection (`detection.py`):** YOLOv8n via `ultralytics`, pretrained on COCO, filtered to class 73 (`book`), CPU inference. Confidence threshold (`0.2`) and crop padding were tuned empirically against real bookshelf photos, not guessed -- COCO's `book` boxes can be coarse (a cluster of spines rather than one clean box each), which is a known limitation of using a general-purpose COCO model rather than something trained specifically on book spines.
+**Detection (`detection.py`):** YOLOv8n via `ultralytics`, pretrained on COCO, filtered to class 73 (`book`), CPU inference. Confidence threshold (`0.2`) and crop padding were tuned empirically against real bookshelf photos. COCO's `book` boxes can be coarse (a cluster of spines rather than one clean box each), which is a known limitation of using a general-purpose COCO model rather than something trained specifically on book spines.
 
-**VLM reading (`vlm.py`):** Google's Gemini Interactions API (`gemini-3.6-flash`), `thinking_level: "minimal"` (thinking is pure latency/cost overhead for a read-the-text task, no product value), structured JSON output via a response schema instead of prompting for JSON and hoping. Spine crops are batched up to 12 per call rather than one call per spine, to amortize the fixed per-call overhead. Batches for one photo run **concurrently** via a thread pool rather than sequentially -- a photo with enough spines to need 4 batches was taking ~41 seconds run sequentially (roughly the sum of each call's latency), which is exactly the kind of scaling problem that turns into a client timeout on a real network. Running the batches concurrently instead cut that to the latency of the slowest single batch, around 8-19 seconds depending on server load, for the same photo.
+## VLM reading
 
-That parallelization surfaced a real bug worth documenting: `google.genai.Client()` is not safe to share across threads. Concurrent calls on one shared client raced on its underlying `httpx` connection -- one thread finishing first would silently close the connection out from under the others still in flight, surfacing as `RuntimeError: Cannot send a request, as the client has been closed.` Fixed by giving each worker thread its own client (`threading.local()`) instead of one shared global.
+**VLM reading (`vlm.py`):** Google's Gemini Interactions API (`gemini-3.6-flash`), `thinking_level: "minimal"` (thinking is unnecessary for just reading the image text), structured JSON output with a response schema. Spine crops are batched up to 12 per call rather than one call per spine or one call for all spines. Batches for one photo run **concurrently** using a thread pool rather than sequentially. A photo with enough spines to need 4 batches was taking around 41 seconds to run sequentially. Running the batches concurrently instead brought the latency to the slowest batch, around 8-19 seconds depending on server load, for the same photo.
 
-Every element of a VLM response is parsed defensively (per-book `try/except`, not one big one) so one malformed element can't sink the rest of a batch. A batch that fails entirely (timeout, network error, malformed JSON) marks every spine in it `read_status="failed"` rather than raising -- those still become `PendingDetection` rows, since a failed read is still something a human needs to decide about (type it in manually, or discard it), and it doesn't need to block review of the rest of the photo.
+That parallelization brought a real bug worth noting: `google.genai.Client()` is not safe to share across threads. Concurrent calls on one shared client raced on its underlying `httpx` connection. If one thread finished first, it would silently close the connection from the others even if they were still running. This was fixed by giving each worker thread its own local client (`threading.local()`) instead of using a single shared global client.
+
+Every element of a VLM response is parsed (per-book `try/except`, not one big one) so one broken element doesn't stop the rest of the batch. A batch that fails entirely marks every spine in it `read_status="failed"`. They still become `PendingDetection` rows, since a failed read is still something a human needs to decide about and it doesn't need to block review of the rest of the photo.
 
 ## Latency & cost
 
@@ -103,16 +103,25 @@ Measured against a real 41-spine bookshelf photo (`backend/test_photos/bookshelf
 | VLM reads, 4 batches, concurrent (current) | ~8-19s |
 | Estimated VLM cost for this photo | ~$0.04 (~$0.001/book) |
 
-VLM cost is computed from the Interactions API's real reported token usage (`usage.total_input_tokens` / `total_output_tokens`) against Gemini 3.6 Flash's published per-token pricing, not estimated -- every `/api/scan/` response includes this in its `meta` block so the number above isn't a one-off measurement, it's what the app reports for every scan.
+VLM cost is computed from the API's real reported token usage (`usage.total_input_tokens` / `total_output_tokens`) against Gemini 3.6 Flash's published per-token pricing. Every `/api/scan/` response includes this in its `meta` block so the number above.
+
+### Cost at scale
+
+(~$0.000963/book, ~41 books/photo):
+
+| Books scanned | Photos | Estimated VLM cost |
+|---|---|---|
+| 1,000 | 24 | ~$0.96 |
+| 100,000 | 2,439 | ~$96.31 |
+| 1,000,000 | 24,390 | ~$963.10 |
 
 ## Known limitations
 
-- **The app only recognizes books already in `catalog.csv`.** Matching is entirely catalog-relative -- there's no external book database lookup, so a book that isn't one of the catalog's 123 entries will always resolve to `"unmatched"`, regardless of how clearly the VLM reads its spine. The fallback is the review screen's manual title/author entry (saved with `match_status_at_add: "manual"`, `catalog_id: null`), not a smarter match. This is a real architectural boundary, not a bug -- worth knowing going in, since it shapes what "the app didn't recognize this book" actually means.
-- **YOLO's COCO `book` class isn't spine-specific.** It can produce coarse boxes on a dense, tightly-packed shelf. A model fine-tuned on book spines specifically would do better; out of scope for the time available here.
-- **Author matching can't resolve initials vs. full names** ("J.K." vs. "Joanne") from string similarity alone -- title-weighting is the honest mitigation, not a fix.
-- **Confidence thresholds are heuristic**, tuned by eye against test photos and the deliberately-messy catalog, not fit against a labeled dataset.
-- **A failed VLM batch loses every spine in that batch** (up to 12), not just one -- the tradeoff for batching calls instead of doing one call per spine. Mitigated by keeping batches small and having every result still land as a reviewable (if failed) pending row rather than silently vanishing.
-- **Phone-to-backend networking is real LAN networking**, not a same-machine shortcut -- Wi-Fi quality between the two devices directly affects reliability, same as any client/server setup on a local network.
+- **The app only recognizes books already in `catalog.csv`.** Matching is dependent on if the catalog has the information of a book. A book that isn't one of the catalog's entries will always resolve to `"unmatched"` because there is no external lookup or RAG system. The fallback is the review screen's manual title/author entry (saved with `match_status_at_add: "manual"`, `catalog_id: null`).
+- **YOLO's COCO `book` class isn't trained specifically on book spines.** It can produce coarse detection boxes on a packed shelf. A model fine-tuned on book spines specifically would obviously do better, but this is out of scope for the time available here.
+- **Author matching can't resolve initials vs. full names** Different designs can have different aliases for the author name ("J.K." vs. "Joanne"). So, title-weighting is important, but clearly not a fix.
+- **Confidence thresholds are heuristic.** The confidence thresholds were manually tuned from short trial and error. So, it's highly likely that the thresholds aren't optimally tuned.
+- **A failed VLM batch loses every spine in that batch.** This is the tradeoff for efficient processing. It's mitigated by keeping batch sizes small.
 
 ## API reference
 

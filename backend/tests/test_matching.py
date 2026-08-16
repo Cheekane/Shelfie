@@ -117,3 +117,51 @@ class MatchingTests(SimpleTestCase):
     def test_empty_title_is_unmatched(self) -> None:
         result = match_book("", "Someone")
         self.assertEqual(result.status, "unmatched")
+
+    def test_missing_author_still_auto_matches_a_unique_title(self) -> None:
+        # No author read at all, but the title alone is unique in the
+        # catalog -- NO_AUTHOR_TITLE_WEIGHT (0.85) plus the substring
+        # bonus is still enough to clear the auto-add bar on its own.
+        result = match_book("Circe", None)
+        self.assertEqual(result.status, "auto")
+        self.assertEqual(result.catalog_id, "c121")
+
+    def test_author_initials_vs_full_first_name_still_matches_unique_title(self) -> None:
+        # "J.K." vs "Joanne" is a real gap -- author similarity against
+        # the catalog's stored "J.K. Rowling" is only ~0.72 here, not a
+        # clean match. But for a unique title, TITLE_WEIGHT (0.7) plus
+        # the substring bonus carries the match through anyway. This is
+        # the title-weighting mitigation working as designed, not proof
+        # the initials-vs-full-name limitation doesn't exist.
+        result = match_book("Harry Potter and the Philosopher's Stone", "Joanne Rowling")
+        self.assertEqual(result.status, "auto")
+        self.assertEqual(result.catalog_id, "c007")
+
+    def test_single_character_ocr_typo_still_matches(self) -> None:
+        # "Graet" for "Great" -- WRatio absorbs a small character-level
+        # misread without trouble.
+        result = match_book("The Graet Gatsby", "F. Scott Fitzgerald")
+        self.assertEqual(result.status, "auto")
+        self.assertEqual(result.catalog_id, "c036")
+
+    def test_reordered_title_words_still_matches_known_limitation(self) -> None:
+        # WRatio is largely word-order-insensitive: a title with its
+        # words swapped still matches confidently. Documented here as a
+        # known limitation, not a fix -- two genuinely different books
+        # whose titles happen to be word-order swaps of each other
+        # would be conflated the same way.
+        result = match_book("Farm Animal", "George Orwell")
+        self.assertEqual(result.status, "auto")
+        self.assertEqual(result.catalog_id, "c028")
+
+    def test_unreadable_title_with_known_author_is_unmatched_known_limitation(self) -> None:
+        # Candidate generation is entirely title-driven
+        # (_generate_candidate_ids only ever searches by title) -- there
+        # is no author-only fallback path. A known author with an
+        # unreadable title currently yields nothing to work with, not
+        # even a suggestion. Documented here as a known limitation, not
+        # a fix.
+        result = match_book("", "George Orwell")
+        self.assertEqual(result.status, "unmatched")
+        self.assertIsNone(result.catalog_id)
+        self.assertEqual(result.candidates, [])
