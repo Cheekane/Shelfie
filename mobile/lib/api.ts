@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import type {
     ConfirmPendingInput,
     LibraryBook,
@@ -43,14 +45,25 @@ async function parseOrThrow<T>(response: Response): Promise<T> {
 
 export async function scanPhoto(imageUri: string): Promise<ScanResponse> {
     const formData = new FormData();
-    // React Native's fetch polyfill special-cases this { uri, name, type }
-    // shape in place of a real Blob/File -- do not set a Content-Type
-    // header manually, fetch sets the multipart boundary itself.
-    formData.append('image', {
-        uri: imageUri,
-        name: 'shelf.jpg',
-        type: 'image/jpeg',
-    } as unknown as Blob);
+
+    if (Platform.OS === 'web') {
+        // On web, imageUri is a blob:/data: URL from the browser's file
+        // picker -- FormData needs a real Blob there, the {uri,name,type}
+        // shape below is a React Native-only fetch polyfill trick a real
+        // browser doesn't understand (it just coerces the object to a
+        // string, so Django never sees actual image bytes).
+        const blob = await (await fetch(imageUri)).blob();
+        formData.append('image', blob, 'shelf.jpg');
+    } else {
+        // React Native's fetch polyfill special-cases this { uri, name, type }
+        // shape in place of a real Blob/File -- do not set a Content-Type
+        // header manually, fetch sets the multipart boundary itself.
+        formData.append('image', {
+            uri: imageUri,
+            name: 'shelf.jpg',
+            type: 'image/jpeg',
+        } as unknown as Blob);
+    }
 
     const response = await fetchWithTimeout(
         `${API_BASE_URL}/api/scan/`,
